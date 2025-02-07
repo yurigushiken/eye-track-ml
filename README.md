@@ -5,13 +5,13 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
 <table style="margin: auto;">
   <tr>
     <td style="text-align: center;">
-      <img src="media/sw_original.gif" alt="Infant Event Representations Original" style="width:640px; height:360px; object-fit: contain;">
+      <img src="media/sw_original.gif" alt="Infant Event Representations Original" style="width:800px; height:600px; object-fit: contain;">
     </td>
     <td style="vertical-align: middle; text-align: center; font-size: 3rem; padding: 0 20px;">
       &#8594;
     </td>
     <td style="text-align: center;">
-      <img src="media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:640px; height:360px; object-fit: contain;">
+      <img src="media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:800px; height:600px; object-fit: contain;">
     </td>
   </tr>
   <tr>
