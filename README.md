@@ -7,7 +7,7 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
   <!-- Left image & caption -->
   <div style="text-align: center;">
     <img
-      src="media/infant_event-representations-original-video-gif.gif"
+      src="media/sw_original.gif"
       alt="Infant Event Representations Original"
       style="width: 300px;"
     />
@@ -23,7 +23,7 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
   <!-- Right image & caption -->
   <div style="text-align: center;">
     <img
-      src="media/infant_event-representations-v2-gif.gif"
+      src="media/sw_sam2.gif"
       alt="Infant Event Representations V2"
       style="width: 390px;"
     />
