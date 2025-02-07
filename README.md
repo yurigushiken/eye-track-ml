@@ -5,13 +5,13 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
 <table style="margin: auto;">
   <tr>
     <td style="text-align: center;">
-      <img src="media/sw_original.gif" alt="Infant Event Representations Original" style="width:640px; height:480px;">
+      <img src="media/sw_original.gif" alt="Infant Event Representations Original" style="width:640px; height:360px; object-fit: contain;">
     </td>
     <td style="vertical-align: middle; text-align: center; font-size: 3rem; padding: 0 20px;">
       &#8594;
     </td>
     <td style="text-align: center;">
-      <img src="media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:640px; height:480px;">
+      <img src="media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:640px; height:360px; object-fit: contain;">
     </td>
   </tr>
   <tr>
@@ -26,11 +26,6 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
     </td>
   </tr>
 </table>
-
-<div style="text-align: center; margin-top: 2rem;">
-  <img src="media/infant_eye-tracking_datasheet.png" alt="Infant Eye-Tracking datasheet" style="max-width: 500px;">
-  <p><strong>participant datasheet, 1 of 72</strong></p>
-</div>
 
 We begin with ~75 participant video files (~300 minutes / 540k frames) that would take many hours to code by hand. This ML-powered and rule-based verified workflow automates the process, outputting labeled video files and accompanying datasheets.
 
