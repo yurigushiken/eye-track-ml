@@ -2,43 +2,36 @@
 
 A machine learning pipeline for automated analysis of infant eye-tracking videos, processing thousands of frames efficiently.
 
-<div style="display: flex; align-items: center; justify-content: center; gap: 50px; margin: 2rem 0;">
-  
-  <!-- Left image & caption -->
-  <div style="text-align: center;">
-    <img
-      src="media/sw_original.gif"
-      alt="Infant Event Representations Original"
-      style="width: 300px;"
-    />
-    <p><strong>Infant Event Representations Original</strong><br/>
-    <a href="https://youtu.be/M90Rbu8EGZc" target="_blank">YouTube Video of original</a></p>
-  </div>
-  
-  <!-- Arrow -->
-  <div style="font-size: 3rem; display: flex; align-items: center;">
-    &#8594;
-  </div>
-  
-  <!-- Right image & caption -->
-  <div style="text-align: center;">
-    <img
-      src="media/sw_sam2.gif"
-      alt="Infant Event Representations V2"
-      style="width: 390px;"
-    />
-    <p><strong>Infant Event Representations V2</strong><br/>
-    <a href="https://youtu.be/45lbqvLpGYQ" target="_blank">YouTube Video of V2</a></p>
-  </div>
-
-</div>
+<table style="margin: auto;">
+  <tr>
+    <td style="text-align: center;">
+      <img src="D:/infant eye-tracking/paper-area/media/sw_original.gif" alt="Infant Event Representations Original" style="width:300px;">
+    </td>
+    <td style="vertical-align: middle; text-align: center; font-size: 3rem; padding: 0 20px;">
+      &#8594;
+    </td>
+    <td style="text-align: center;">
+      <img src="D:/infant eye-tracking/paper-area/media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:390px;">
+    </td>
+  </tr>
+  <tr>
+    <td style="text-align: center; padding-top: 10px;">
+      <strong>Infant Event Representations Original</strong><br>
+      <a href="https://youtu.be/M90Rbu8EGZc" target="_blank">YouTube Video of original</a>
+    </td>
+    <td></td>
+    <td style="text-align: center; padding-top: 10px;">
+      <strong>Infant Event Representations V2</strong><br>
+      <a href="https://youtu.be/45lbqvLpGYQ" target="_blank">YouTube Video of V2</a>
+    </td>
+  </tr>
+</table>
 
 <div style="text-align: center; margin-top: 2rem;">
-  <img src="media/infant_eye-tracking_datasheet.png"
-       alt="Infant Eye-Tracking datasheet"
-       style="max-width: 500px;" />
+  <img src="media/infant_eye-tracking_datasheet.png" alt="Infant Eye-Tracking datasheet" style="max-width: 500px;">
   <p><strong>participant datasheet, 1 of 72</strong></p>
 </div>
+
 
 We begin with ~75 participant video files (~300 minutes / 540k frames) that would take many hours to code by hand. This ML-powered and rule-based verified workflow automates the process, outputting labeled video files and accompanying datasheets.
 
