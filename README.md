@@ -7,8 +7,8 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
     <td style="text-align: center;">
       <img src="media/sw_original.gif" alt="Infant Event Representations Original" style="width:800px;">
     </td>
-    <td style="vertical-align: middle; text-align: center; font-size: 3rem; padding: 0 20px;">
-      &#8594;
+    <td style="vertical-align: middle; text-align: center; font-size: 6rem; padding: 0 40px; font-weight: bold;">
+      ➡️
     </td>
     <td style="text-align: center;">
       <img src="media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:800px;">
