@@ -17,12 +17,12 @@ A machine learning pipeline for automated analysis of infant eye-tracking videos
   <tr>
     <td style="text-align: center; padding-top: 10px;">
       <strong>Infant Event Representations Original</strong><br>
-      <a href="https://youtu.be/M90Rbu8EGZc" target="_blank">YouTube Video of original</a>
+      <a href="https://youtu.be/45lbqvLpGYQ" target="_blank">YouTube Video of original</a>
     </td>
     <td></td>
     <td style="text-align: center; padding-top: 10px;">
       <strong>Infant Event Representations V2</strong><br>
-      <a href="https://youtu.be/45lbqvLpGYQ" target="_blank">YouTube Video of V2</a>
+      <a href="https://youtu.be/JsbvKOgkfCk" target="_blank">YouTube Video of V2</a>
     </td>
   </tr>
 </table>
