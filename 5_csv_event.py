@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 5_datasheet_background.py
+# 5_csv_event.py
 
 import os
 import pandas as pd
@@ -11,6 +11,9 @@ import warnings
 # Suppress specific pandas warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
+
+# Import configuration variables for step 5
+from config import EVENT_CSV_INPUT_DIR, EVENT_CSV_OUTPUT_DIR
 
 def locate_single_csv(run_dir, csv_name="detections_summary.csv"):
     """
@@ -35,7 +38,7 @@ def extract_frame_number(filename):
     """
     Extracts the frame number from a filename.
     """
-    stem = Path(filename).stem  
+    stem = Path(filename).stem
     parts = stem.split('_')
     if len(parts) < 2:
         return None
@@ -58,65 +61,85 @@ def calculate_time(frame_number, fps=30):
 def print_statistics(df):
     """
     Print detailed statistics about segments and trials.
+
+    Expects columns:
+    - 'event_verified'
+    - 'frame_count_event'
+    - 'trial_number_global'
+    - 'segment' (the approach/interact/depart or 'n/a')
     """
     print("\n=== Segment and Trial Statistics ===")
-    for (event, trial), group in df.groupby(['events_corrected', 'trial_number']):
-        if event == 'green_dot':
-            print(f"\nEvent: {event}, Trial: {trial}")
-            print(f"  Total Frames: {group['frame_count'].max()}")
-            print(f"  CHAPTER: n/a, frame_count_chapter: {group['frame_count_chapter'].tolist()}")
-        else:
-            print(f"\nEvent: {event}, Trial: {trial}")
-            total_frames = group['frame_count'].max()
-            print(f"  Total Frames: {total_frames}")
-            chapters = group['CHAPTER'].value_counts().sort_index()
-            for chap in ['approach', 'interaction', 'departure']:
-                count = chapters.get(chap, 0)
-                print(f"    {chap.capitalize()}: {count} frames")
+    # Group by event_verified and trial_number_global
+    for (evt, trial_g), group in df.groupby(['event_verified', 'trial_number_global']):
+        print(f"\nEvent: {evt}, Global Trial: {trial_g}")
+        total_frames = group['frame_count_event'].max()
+        print(f"  Total Frames: {total_frames}")
+
+        # Summarize the approach/interaction/departure chapters
+        chapters = group['segment'].value_counts().sort_index()
+        for chap_label in chapters.index:
+            count = chapters[chap_label]
+            print(f"    {chap_label.capitalize()}: {count} frames")
     print("=== End of Statistics ===\n")
+
 
 def process_events(df):
     """
-    Process the DataFrame to ensure all events between green_dots are the same.
+    Process the DataFrame to unify consecutive frames into segments,
+    rename the event labels, assign trials, accumulate a global trial
+    number for each event, and split frames into approach/interaction/
+    departure chapters.
+
+    Returns the DataFrame with:
+      - 'event_verified' (renamed from events_corrected)
+      - 'frame_count_event' (was frame_count)
+      - 'frame_count_trial_number' (was frame_number_within_trial)
+      - 'segment' (was CHAPTER => approach/interaction/departure)
+      - 'frame_count_segment' (was frame_count_chapter)
+      - 'trial_number'
+      - 'trial_number_global'
     """
-    # Step 1: Identify if the event is a green_dot
+    # STEP 1: Mark green_dot vs. non-green_dot
     df['is_green_dot'] = df['events'] == 'green_dot'
 
-    # Step 2: Identify where the event type changes
+    # STEP 2: Identify boundaries of segments
     df['segment_change'] = (df['is_green_dot'] != df['is_green_dot'].shift(1).fillna(False)).astype(bool)
 
-    # Step 3: Assign segment number
-    df['segment'] = df['segment_change'].cumsum()
+    # STEP 3: Create a numeric segment ID
+    df['segment_id'] = df['segment_change'].cumsum()
 
-    # Step 4: Drop helper columns
-    df = df.drop(columns=['is_green_dot', 'segment_change'])
+    # Drop helper columns
+    df.drop(columns=['is_green_dot', 'segment_change'], inplace=True)
 
-    # Step 5: Calculate mode for non-green_dot events
+    # Find the most frequent event label in each segment (for non-green_dot).
     df_non_green = df[df['events'] != 'green_dot'].copy()
-    segment_modes = df_non_green.groupby('segment')['events'].agg(
-        lambda x: x.mode().iloc[0] if not x.mode().empty else 'None'
-    ).reset_index()
-    segment_modes = segment_modes.rename(columns={'events': 'segment_mode'})
+    segment_modes = (
+        df_non_green.groupby('segment_id')['events']
+        .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else 'None')
+        .reset_index()
+        .rename(columns={'events': 'segment_mode'})
+    )
 
-    # Step 6: Merge modes back
-    df = df.merge(segment_modes, on='segment', how='left')
+    # Merge the "segment_mode" back in
+    df = df.merge(segment_modes, on='segment_id', how='left')
 
-    # Step 7: Assign corrected events
+    # If it's not green_dot, unify events to the mode
     df['events_corrected'] = df.apply(
         lambda row: row['segment_mode'] if row['events'] != 'green_dot' else 'green_dot',
         axis=1
     )
 
-    # Step 8: Assign frame count
-    df['frame_count'] = df.groupby('segment').cumcount() + 1
+    # Count frames within each segment
+    df['frame_count'] = df.groupby('segment_id').cumcount() + 1
 
-    # Define event trial frame counts
+    # Frame counts for each event
     EVENT_TRIAL_FRAME_COUNT = {
         'sw': 150, 'swo': 185, 'hw': 150, 'hwo': 150,
-        'gw': 150, 'gwo': 150, 'uhw': 150, 'uhwo': 150,
+        'gw': 150, 'gwo': 185, 'uhw': 150, 'uhwo': 150, # GWO was 150, corrected to 185 to match old script
         'f': 150, 'ugw': 150, 'ugwo': 150
     }
 
+    # Chapter splits
     EVENT_CHAPTER_FRAME_COUNT = {
         'gwo': {'approach': 40, 'interaction': 64, 'departure': 46},
         'uhw': {'approach': 32, 'interaction': 81, 'departure': 39},
@@ -131,100 +154,121 @@ def process_events(df):
         'gw': {'approach': 31, 'interaction': 64, 'departure': 55}
     }
 
-    def assign_trials(group):
+    def assign_local_trials(group):
+        """Split each segment into local trials (1..N)."""
         if group['events_corrected'].iloc[0] == 'green_dot':
             group['trial_number'] = None
             group['frame_number_within_trial'] = group['frame_count']
             return group
 
-        event_type = group['events_corrected'].iloc[0]
-        expected_frames = EVENT_TRIAL_FRAME_COUNT.get(event_type, 150)
+        evt_type = group['events_corrected'].iloc[0]
+        expected_frames = EVENT_TRIAL_FRAME_COUNT.get(evt_type, 150)
         total_frames = group['frame_count'].max()
-        
-        number_of_full_trials = total_frames // expected_frames
-        leftover_frames = total_frames % expected_frames
 
-        if leftover_frames >= (expected_frames / 2):
-            number_of_trials = number_of_full_trials + 1
-            trials_frame_counts = [expected_frames] * number_of_full_trials + [leftover_frames]
+        full_trials = total_frames // expected_frames
+        leftover = total_frames % expected_frames
+
+        # Decide how many trials
+        if leftover >= (expected_frames / 2):
+            number_of_trials = full_trials + 1
+            trial_frames = [expected_frames] * full_trials + [leftover]
         else:
-            if number_of_full_trials == 0:
+            if full_trials == 0:
                 number_of_trials = 1
-                trials_frame_counts = [leftover_frames]
+                trial_frames = [leftover]
             else:
-                number_of_trials = number_of_full_trials
-                trials_frame_counts = [expected_frames] * number_of_full_trials
-                trials_frame_counts[-1] += leftover_frames
+                number_of_trials = full_trials
+                trial_frames = [expected_frames] * full_trials
+                trial_frames[-1] += leftover
 
         trial_number = []
-        frame_number_within_trial = []
+        frame_within_trial = []
         current_trial = 1
-        for trial_frames in trials_frame_counts:
-            for frame in range(1, trial_frames + 1):
+        for tf in trial_frames:
+            for fct in range(1, tf + 1):
                 trial_number.append(current_trial)
-                frame_number_within_trial.append(frame)
+                frame_within_trial.append(fct)
             current_trial += 1
 
         group = group.copy()
         group['trial_number'] = trial_number
-        group['frame_number_within_trial'] = frame_number_within_trial
+        group['frame_number_within_trial'] = frame_within_trial
         return group
 
     def assign_chapters(trial_group):
+        """Assign approach/interaction/departure based on frame_number_within_trial."""
         if trial_group['events_corrected'].iloc[0] == 'green_dot':
             trial_group['CHAPTER'] = 'n/a'
             trial_group['frame_count_chapter'] = trial_group['frame_number_within_trial']
             return trial_group
 
-        event_type = trial_group['events_corrected'].iloc[0]
-        chapter_mapping = EVENT_CHAPTER_FRAME_COUNT.get(
-            event_type, 
-            {'approach': 150, 'interaction': 150, 'departure': 150}
+        evt_type = trial_group['events_corrected'].iloc[0]
+        mapping = EVENT_CHAPTER_FRAME_COUNT.get(
+            evt_type, {'approach': 150, 'interaction': 150, 'departure': 150}
         )
-        
+
         chapters = ['approach', 'interaction', 'departure']
-        expected_frames = [chapter_mapping.get(chap, 150) for chap in chapters]
-
-        cumulative_expected = []
-        cum_sum = 0
+        expected_frames = [mapping.get(ch, 150) for ch in chapters]
+        cumulative_thresholds = []
+        csum = 0
         for ef in expected_frames:
-            cum_sum += ef
-            cumulative_expected.append(cum_sum)
+            csum += ef
+            cumulative_thresholds.append(csum)
 
-        total_frames = trial_group['frame_number_within_trial'].max()
+        assigned_chaps = []
+        frame_chap = []
 
-        chapters_assigned = []
-        frame_counts_chapter = []
         for fn in trial_group['frame_number_within_trial']:
-            assigned = False
-            for i, threshold in enumerate(cumulative_expected):
-                if fn <= threshold:
-                    chap = chapters[i]
-                    frame_num = fn - (cumulative_expected[i-1] if i > 0 else 0)
-                    chapters_assigned.append(chap)
-                    frame_counts_chapter.append(frame_num)
-                    assigned = True
+            placed = False
+            for i, th in enumerate(cumulative_thresholds):
+                if fn <= th:
+                    assigned_chaps.append(chapters[i])
+                    offset = cumulative_thresholds[i - 1] if i > 0 else 0
+                    frame_chap.append(fn - offset)
+                    placed = True
                     break
-            if not assigned:
-                chap = chapters[-1]
-                frame_num = fn - (cumulative_expected[-1] if cumulative_expected else 0)
-                chapters_assigned.append(chap)
-                frame_counts_chapter.append(frame_num)
+            if not placed:
+                assigned_chaps.append(chapters[-1])
+                offset = cumulative_thresholds[-1]
+                frame_chap.append(fn - offset)
 
         trial_group = trial_group.copy()
-        trial_group['CHAPTER'] = chapters_assigned
-        trial_group['frame_count_chapter'] = frame_counts_chapter
-
+        trial_group['CHAPTER'] = assigned_chaps
+        trial_group['frame_count_chapter'] = frame_chap
         return trial_group
 
-    # Apply trial assignments
-    df = df.groupby('segment').apply(assign_trials)
+    # Group by numeric segment ID
+    df = df.groupby('segment_id').apply(assign_local_trials)
 
-    # Apply chapter assignments
+    # Then group by (events_corrected, local trial_number)
     df = df.groupby(['events_corrected', 'trial_number']).apply(assign_chapters)
-    
-    # Final sorting
-    df = df.sort_values('frame_number').reset_index(drop=True)
+    df.sort_values('frame_number', inplace=True, ignore_index=True)
+
+    # Accumulate global trial numbers for each event
+    df['trial_number_global'] = 0
+    event_trial_offset = {}
+    for seg_id, seg_data in df.groupby('segment_id', sort=False):
+        e_type = seg_data['events_corrected'].iloc[0]
+        if e_type == 'green_dot':
+            continue
+
+        offset = event_trial_offset.get(e_type, 0)
+        df.loc[seg_data.index, 'trial_number_global'] = seg_data['trial_number'] + offset
+        event_trial_offset[e_type] = offset + seg_data['trial_number'].max()
+
+    # Final rename:
+    #   events_corrected -> event_verified
+    #   frame_count -> frame_count_event
+    #   frame_number_within_trial -> frame_count_trial_number
+    #   CHAPTER -> segment
+    #   frame_count_chapter -> frame_count_segment
+    df.rename(columns={
+        'events_corrected': 'event_verified',
+        'frame_count': 'frame_count_event',
+        'frame_number_within_trial': 'frame_count_trial_number',
+        'CHAPTER': 'segment',
+        'frame_count_chapter': 'frame_count_segment'
+    }, inplace=True)
 
     return df
 
@@ -232,43 +276,29 @@ def save_corrected_csv(df, participant_dir, output_dir):
     """
     Save the corrected DataFrame to a new CSV file in the output directory.
     The filename is constructed as: (participant)-datasheet-background.csv
-    For example, if participant_dir.name is "FiftySix-0501-1673-1024-inference",
-    the output filename will be "FiftySix-0501-1673-datasheet-background.csv".
     """
-    # First rename columns to the new names
-    df = df.rename(columns={
-        'frame_count': 'frame_count_event',
-        'frame_number_within_trial': 'frame_count_trial_number',
-        'CHAPTER': 'segment',
-        'frame_count_chapter': 'frame_count_segment'
-    })
-
-    # Define the desired columns in the new order
     desired_columns = [
         'frame_number',
-        'events_corrected',
+        'event_verified',
         'frame_count_event',
         'trial_number',
+        'trial_number_global',
         'frame_count_trial_number',
         'segment',
         'frame_count_segment'
     ]
-    
-    df_cleaned = df[desired_columns]
-    
-    # Construct the output filename
+    df_cleaned = df[[c for c in desired_columns if c in df.columns]]
+
     participant_name = participant_dir.name
-    # Remove '-1024' from the participant name if it exists
     participant_name = participant_name.replace("-1024", "")
-    # Replace "inference" with "datasheet-background"
     output_filename = participant_name.replace("inference", "datasheet-background") + ".csv"
     corrected_csv_path = output_dir / output_filename
     try:
         df_cleaned.to_csv(corrected_csv_path, index=False)
         print(f"✓ Corrected CSV saved at: {corrected_csv_path}")
-    except Exception as e:
-        print(f"✗ Error saving corrected CSV: {e}")
-        return
+    except Exception as exc:
+        print(f"✗ Error saving corrected CSV: {exc}")
+
 
 def process_participant(participant_dir, priority_order, fps, output_dir):
     """
@@ -287,46 +317,34 @@ def process_participant(participant_dir, priority_order, fps, output_dir):
         print(f"✗ Error reading CSV file {csv_file}: {e}. Skipping.")
         return
 
-    # Rename columns (if necessary) – assuming CSV contains 'frame_number' and 'What'
-    # Here we assume that the CSV has columns 'frame_number' and 'What' (which we treat as 'events')
     df = df.rename(columns={
         'frame_number': 'frame_number',
         'What': 'events'
     })
 
     df = df.sort_values('frame_number').reset_index(drop=True)
-
-    # Process events
     df_corrected = process_events(df)
-    
-    # Print statistics
-    print_statistics(df_corrected)
 
-    # Drop unnecessary columns
-    df_corrected = df_corrected.drop(columns=['segment', 'segment_mode', 'events'])
-    
-    # Save the corrected CSV to the global output directory with the new naming scheme
+    print_statistics(df_corrected)
+    df_corrected = df_corrected.drop(columns=['segment_id', 'segment_mode', 'events']) # Removed 'segment' and 'segment_mode'
     save_corrected_csv(df_corrected, participant_dir, output_dir)
+
 
 def main():
     """
     1. Look for detections_summary.csv files in participant output directories under
-       D:\infant eye-tracking\paper-area\4_inference_background_output.
+       the background inference output directory.
     2. For each participant, process the CSV to produce a corrected datasheet.
-    3. Save the corrected datasheet in D:\infant eye-tracking\paper-area\5_datasheet_background_output
-       with the filename (participant)-datasheet-background.csv.
+    3. Save the corrected datasheet in the global output directory for background datasheets.
     """
-    # Input root is the global background inference output directory
-    input_root = Path(r"D:\infant eye-tracking\paper-area\4_inference_background_output")
-    # Global output directory for background datasheets
-    output_root = Path(r"D:\infant eye-tracking\paper-area\5_datasheet_background_output")
+    input_root = Path(EVENT_CSV_INPUT_DIR) # Use corrected input path from config
+    output_root = Path(EVENT_CSV_OUTPUT_DIR) # Use corrected output path from config
     output_root.mkdir(parents=True, exist_ok=True)
-    
-    # Gather all participant directories by locating detections_summary.csv files
+
     participant_dirs = set()
     for path in input_root.rglob("detections_summary.csv"):
         participant_dirs.add(path.parent)
-    
+
     if not participant_dirs:
         print("No directories with detections_summary.csv found in the background inference outputs.")
         print("Please ensure you have run the background inference script first.")
@@ -335,8 +353,7 @@ def main():
     print(f"Found {len(participant_dirs)} directories to process:")
     for d in participant_dirs:
         print(f"- {d}")
-    
-    # Define stacking order (priority) for events
+
     priority_order = [
         'toy',
         'hand_man',
@@ -348,12 +365,13 @@ def main():
         'green_dot',
         'screen'
     ]
-    
+
     for participant_dir in tqdm(list(participant_dirs), desc="Processing participants"):
         print(f"\n--- Processing Directory: {participant_dir} ---")
         process_participant(participant_dir, priority_order, fps=30, output_dir=output_root)
 
     print("\n✓ All directories processed successfully!")
+
 
 if __name__ == "__main__":
     main()

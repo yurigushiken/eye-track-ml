@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 2_inference_subjects.py
+# 2_inference_object_yolo.py
 
 import os
 import cv2
@@ -19,22 +19,21 @@ from collections import deque
 import requests.packages.urllib3.util.retry
 import requests.adapters
 
+from dotenv import load_dotenv
+load_dotenv()
+
 ##############################################################################
 #                                  SETTINGS                                  #
 ##############################################################################
 
-# Directory from the first script's output containing participant folders
-PREPROCESSING_OUTPUT_DIR = r"D:\infant eye-tracking\paper-area\1_preprocessing_output"
-# Directory where the inference outputs will be written
-INFERENCE_OUTPUT_DIR = r"D:\infant eye-tracking\paper-area\2_inference_subjects_output"
+# For this script, the input comes from preprocessed frames and the output goes to YOLO object detection results.
+from config import YOLO_OBJ_INPUT_DIR, YOLO_OBJ_OUTPUT_DIR
 
-# YOLO / Roboflow Inference settings
-API_KEY = "vPae8KC6u6DUBxlnjTg7"  # Replace with your actual API key
+API_KEY = os.environ.get("SUBJECTS_API_KEY")
 MODEL_ID = "infant-eye-tracking-toy2"
 MODEL_VERSION = "5"
 INFERENCE_SERVER_URL = "http://localhost:9001/infer/object_detection"
 
-# Processing settings
 YOLO_CONFIDENCE_THRESHOLD = 0.50
 MAX_WORKERS = 16
 BATCH_SIZE = 16
@@ -111,11 +110,8 @@ class OptimizedYOLORunner:
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
 
-        # Create output directories directly inside the provided output_base_dir
         self.json_dir, self.visual_dir = self.create_output_dirs()
-
         self.font = self.load_font()
-
         self.class_color_map = {}
         self.special_colors = {
             "blue_dot":    (203, 192, 255),
@@ -130,11 +126,7 @@ class OptimizedYOLORunner:
         }
 
     def create_output_dirs(self):
-        """
-        Creates output directories for detections and annotated images directly inside output_base_dir.
-        The directory names use the updated naming convention with '-segmentation'.
-        """
-        participant_name = self.output_base_dir.name  # Should already be in the '-segmentation' format.
+        participant_name = self.output_base_dir.name
         json_dir = self.output_base_dir / f"detections-{participant_name}"
         visual_dir = self.output_base_dir / f"image_segmentation-{participant_name}"
         json_dir.mkdir(parents=True, exist_ok=True)
@@ -161,7 +153,6 @@ class OptimizedYOLORunner:
 
     def run_inference_on_image(self, image_path):
         start_local = time.time()
-
         json_path = self.json_dir / f"{Path(image_path).stem}_detections.json"
         annotated_save_path = self.visual_dir / f"{Path(image_path).stem}_annotated.jpg"
 
@@ -173,32 +164,23 @@ class OptimizedYOLORunner:
             with open(image_path, "rb") as f:
                 img_bytes = f.read()
             b64_image = base64.b64encode(img_bytes).decode('utf-8')
-
             payload = {
                 "api_key": self.api_key,
                 "model_id": f"{self.model_id}/{self.model_version}",
                 "model_type": "object-detection",
-                "image": [
-                    {
-                        "type": "base64",
-                        "value": b64_image
-                    }
-                ],
+                "image": [{"type": "base64", "value": b64_image}],
                 "confidence": self.confidence_thresh,
                 "iou_threshold": 0.5,
                 "max_detections": 300
             }
-
             resp = self.session.post(self.inference_url, json=payload, timeout=120)
             if resp.status_code != 200:
                 duration = time.time() - start_local
                 return False, f"Error with YOLO detection: {resp.status_code} - {resp.text}", duration
-
             result = resp.json()
             if not isinstance(result, list) or len(result) == 0:
                 duration = time.time() - start_local
                 return False, "No YOLO result returned.", duration
-
             predictions = result[0].get("predictions", [])
         except Exception as e:
             duration = time.time() - start_local
@@ -211,7 +193,6 @@ class OptimizedYOLORunner:
 
         annotated_overlay = frame_bgr.copy()
         final_predictions = []
-
         for pred in predictions:
             class_name = pred.get("class", "N/A")
             confidence = pred.get("confidence", 0)
@@ -219,18 +200,15 @@ class OptimizedYOLORunner:
             y_center   = pred.get("y", 0)
             bbox_w     = pred.get("width", 0)
             bbox_h     = pred.get("height", 0)
-
             x0 = int(x_center - bbox_w / 2)
             y0 = int(y_center - bbox_h / 2)
             x1 = int(x_center + bbox_w / 2)
             y1 = int(y_center + bbox_h / 2)
-
             padding = 10
             x0 = max(x0 + padding, 0)
             y0 = max(y0 + padding, 0)
             x1 = min(x1 - padding, frame_bgr.shape[1] - 1)
             y1 = min(y1 - padding, frame_bgr.shape[0] - 1)
-
             final_predictions.append({
                 "class": class_name,
                 "confidence": confidence,
@@ -239,76 +217,71 @@ class OptimizedYOLORunner:
                 "width": bbox_w,
                 "height": bbox_h
             })
-
             color_bgr = self.get_class_color(class_name)
             cv2.rectangle(annotated_overlay, (x0, y0), (x1, y1), color_bgr, 2)
-            cv2.putText(
-                annotated_overlay,
-                f"{class_name} {confidence:.2f}",
-                (x0, max(y0 - 5, 0)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color_bgr,
-                2
-            )
-
+            cv2.putText(annotated_overlay, f"{class_name} {confidence:.2f}",
+                        (x0, max(y0 - 5, 0)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color_bgr, 2)
         try:
             with open(json_path, "w") as jf:
                 json.dump(final_predictions, jf, indent=4)
         except Exception as e:
             print(f"Error saving JSON for {image_path}: {e}")
-
         try:
             annotated_pil = Image.fromarray(cv2.cvtColor(annotated_overlay, cv2.COLOR_BGR2RGB))
             annotated_pil.save(str(annotated_save_path), quality=95)
         except Exception as e:
             print(f"Error saving annotated image for {image_path}: {e}")
-
         duration = time.time() - start_local
         return True, str(image_path), duration
 
     def process_images(self):
-        all_files = sorted([
-            p for p in self.input_frames_dir.glob("*.*")
-            if p.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
-        ])
-
+        all_files = sorted([p for p in self.input_frames_dir.glob("*.*")
+                             if p.suffix.lower() in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]])
         total_frames = len(all_files)
         if total_frames == 0:
-            print(f"No frames found in {self.input_frames_dir}")
+            self.directory_status_info = f"No frames found in {self.input_frames_dir}"
+            print(self.directory_status_info)
             return
 
+        annotated_imgs = list(self.visual_dir.glob("*_annotated.*"))
+        done_count = len(annotated_imgs)
+        if done_count >= total_frames:
+            self.directory_status_info = (f"Skipping {self.input_frames_dir}, all {total_frames} frames appear done.")
+            print(self.directory_status_info)
+            return
+
+        self.directory_status_info = (f"Processing {self.input_frames_dir} because {done_count}/{total_frames} frames are annotated so far.")
+        print(self.directory_status_info)
         print(f"Total frames in directory: {total_frames}")
+        print(f"Already done (annotated): {done_count}, not done: {total_frames - done_count}")
 
-        selected_files = []
-        for img_path in all_files:
-            json_path = self.json_dir / f"{img_path.stem}_detections.json"
-            annotated_path = self.visual_dir / f"{img_path.stem}_annotated.jpg"
-            if not (json_path.exists() and annotated_path.exists()):
-                selected_files.append(img_path)
-
-        if len(selected_files) == 0:
-            print(f"All {total_frames} frames already processed; skipping.")
+        unprocessed_files = []
+        for img in all_files:
+            annotated_img = self.visual_dir / f"{img.stem}_annotated{img.suffix}"
+            if not annotated_img.exists():
+                unprocessed_files.append(img)
+        if not unprocessed_files:
+            print(f"All frames in {self.input_frames_dir} are done, skipping.")
             return
-
-        print(f"Processing {len(selected_files)} out of {total_frames} frames.")
-
-        last_messages = deque(maxlen=16)
+        print(f"Will process {len(unprocessed_files)} unprocessed frames.")
+        last_messages = deque(maxlen=10)
         start_time = time.time()
         results = []
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_image = {executor.submit(self.run_inference_on_image, img): img for img in selected_files}
-
+            future_to_image = {executor.submit(self.run_inference_on_image, img): img for img in unprocessed_files}
             processed_count = 0
             for future in as_completed(future_to_image):
                 img_path = future_to_image[future]
                 processed_count += 1
-
                 elapsed_total = time.time() - start_time
                 rate = processed_count / elapsed_total if elapsed_total > 0 else 0
-                est_time_left = (len(selected_files) - processed_count) / rate if rate > 0 else 0
-
+                est_time_left = (len(unprocessed_files) - processed_count) / rate if rate > 0 else 0
+                total_est_time = elapsed_total + est_time_left
+                elapsed_min = int(elapsed_total / 60)
+                total_est_min = int(total_est_time / 60)
+                est_time_left_min = int(est_time_left / 60)
                 try:
                     result_tuple = future.result()
                     if len(result_tuple) == 3:
@@ -322,29 +295,20 @@ class OptimizedYOLORunner:
                     msg = f"Exception: {img_path} -> {e}"
                     file_duration = 0.0
                     short_info = f"✗ {msg}"
-
-                line_message = (
-                    f"[{processed_count}/{len(selected_files)}] "
-                    f"[{rate:.2f} it/s] took {file_duration:.2f}s -- {short_info}"
-                )
+                line_message = (f"[{processed_count}/{len(unprocessed_files)}] "
+                                f"[{rate:.2f} it/s] Rate: {rate:.2f} imgs/s, took {file_duration:.2f}s -- {short_info}")
                 last_messages.append(line_message)
                 results.append((success, msg))
-
                 os.system('cls' if os.name == 'nt' else 'clear')
-
-                elapsed_min = elapsed_total / 60
-                est_min_left = est_time_left / 60
-                percent_done = (processed_count / len(selected_files)) * 100
-
-                print(f"Time Elapsed: {elapsed_min:.1f} min")
-                print(f"Estimated Time Left: {est_min_left:.1f} min")
-                print(f"Progress: {percent_done:0.1f}% ({processed_count}/{len(selected_files)})")
+                print(self.directory_status_info)
+                print(f"Elapsed time: {elapsed_min} min")
+                print(f"Estimated total time: {total_est_min} min (about {est_time_left_min} min remaining)")
                 print(f"Directory: {self.input_frames_dir}")
-
-                print("\n--- Last 16 processed frames ---")
+                percent_done = (processed_count / len(unprocessed_files)) * 100
+                print(f"Progress: {percent_done:0.1f}% ({processed_count}/{len(unprocessed_files)})")
+                print("\n--- Last 10 processed frames ---")
                 for msg_line in last_messages:
                     print(msg_line)
-
         successes = sum(1 for r in results if r[0])
         print(f"\nDone. Successfully processed {successes}/{len(results)} frames.")
         print(f"Results are in {self.output_base_dir}")
@@ -362,28 +326,21 @@ class OptimizedYOLORunner:
                 print(f"Failed to get GPU utilization: {e}")
 
 def main():
-    frames_base = Path(PREPROCESSING_OUTPUT_DIR)
-    if not frames_base.exists():
-        print(f"Preprocessing output directory does not exist: {frames_base}")
+    base_input_dir = Path(YOLO_OBJ_INPUT_DIR)
+    output_base_dir = Path(YOLO_OBJ_OUTPUT_DIR)
+    if not base_input_dir.exists():
+        print(f"Input directory does not exist: {base_input_dir}")
         return
-
-    # Look for directories ending with '-1024-frames'
-    frames_dirs = [d for d in frames_base.iterdir() if d.is_dir() and d.name.endswith("-1024-frames")]
+    output_base_dir.mkdir(parents=True, exist_ok=True)
+    frames_dirs = [d for d in base_input_dir.iterdir() if d.is_dir() and d.name.endswith("-1024-frames")]
     if not frames_dirs:
-        print(f"No directories ending with '-1024-frames' found under {frames_base}")
+        print(f"No participant directories found in {YOLO_OBJ_INPUT_DIR} with '-1024-frames' in the name.")
         return
-
     print(f"Found {len(frames_dirs)} directories to process.")
-
-    inference_output_base = Path(INFERENCE_OUTPUT_DIR)
-    inference_output_base.mkdir(parents=True, exist_ok=True)
-
     for frames_dir in frames_dirs:
-        # Replace '-frames' with '-segmentation' in the directory name
         segmentation_name = frames_dir.name.replace("-frames", "-segmentation")
-        inference_output_dir = inference_output_base / segmentation_name
+        inference_output_dir = output_base_dir / segmentation_name
         inference_output_dir.mkdir(parents=True, exist_ok=True)
-
         print(f"\nProcessing frames directory: {frames_dir}")
         runner = OptimizedYOLORunner(
             input_frames_dir=frames_dir,
@@ -391,6 +348,5 @@ def main():
         )
         runner.process_images()
         runner.monitor_performance()
-
 if __name__ == "__main__":
     main()
