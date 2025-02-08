@@ -159,6 +159,7 @@ def create_movie_csv(participant_dir, csv_data_by_frame):
 
 def gather_frame_numbers_in_inference_dir(images_dir):
     frame_nums = []
+    # This regex will capture any number of digits.
     pattern = re.compile(r"^frame_(\d+)_annotated\.jpg$", re.IGNORECASE)
     if os.path.isdir(images_dir):
         for fname in os.listdir(images_dir):
@@ -172,28 +173,28 @@ def process_participant_dir(participant_name, overall_start_time):
     # Construct images_dir path based on the example paths provided
     images_dir = os.path.join(MOVIE_FRAMES_BASE_DIR, f"{participant_folder_name}-1024-segmentation", f"image_segmentation-{participant_folder_name}-1024-segmentation")
 
-    output_movie_dir = os.path.join(MOVIE_OUTPUT_DIR, participant_folder_name) # output movie will be in this dir
-    os.makedirs(output_movie_dir, exist_ok=True) # create output movie dir if it doesn't exist
+    output_movie_dir = os.path.join(MOVIE_OUTPUT_DIR, participant_folder_name)  # output movie will be in this dir
+    os.makedirs(output_movie_dir, exist_ok=True)  # create output movie dir if it doesn't exist
 
-    avi_files_dir = os.path.dirname(MOVIE_FRAMES_BASE_DIR) # assuming AVI files are in the parent directory of image frames, adjust if needed
-    avi_files = [f for f in os.listdir(avi_files_dir) if f.lower().endswith('.avi') and participant_name in f] # find avi file based on participant name
+    avi_files_dir = os.path.dirname(MOVIE_FRAMES_BASE_DIR)  # assuming AVI files are in the parent directory of image frames, adjust if needed
+    avi_files = [f for f in os.listdir(avi_files_dir) if f.lower().endswith('.avi') and participant_name in f]  # find avi file based on participant name
 
     if avi_files:
         avi_file_base = os.path.splitext(avi_files[0])[0]
         final_movie_name = f"{avi_file_base}-movie.mp4"
     else:
-        final_movie_name = f"{participant_name}-movie.mp4" # fallback movie name if no avi found
-    mp4_output = os.path.join(output_movie_dir, final_movie_name) # output movie path
+        final_movie_name = f"{participant_name}-movie.mp4"  # fallback movie name if no avi found
+    mp4_output = os.path.join(output_movie_dir, final_movie_name)  # output movie path
 
-    csv_data_by_frame, participant_type, participant_age_months, participant_age_years = read_merged_data(participant_name) # read data using participant name
-    movie_csv_path = os.path.join(output_movie_dir, "movie.csv") # movie csv path inside participant output dir
+    csv_data_by_frame, participant_type, participant_age_months, participant_age_years = read_merged_data(participant_name)  # read data using participant name
+    movie_csv_path = os.path.join(output_movie_dir, "movie.csv")  # movie csv path inside participant output dir
 
     if not os.path.exists(movie_csv_path):
         create_movie_csv(output_movie_dir, csv_data_by_frame)
     else:
         print(f"movie.csv already exists in {output_movie_dir}. Skipping creation.")
 
-    print(f"Searching for images in: {images_dir}") # Debugging line: print the image directory path
+    print(f"Searching for images in: {images_dir}")  # Debugging line: print the image directory path
 
     if not os.path.isdir(images_dir):
         print(f"No images folder found in: {images_dir}. Skipping.")
@@ -204,7 +205,7 @@ def process_participant_dir(participant_name, overall_start_time):
         print(f"No annotated frames found in {images_dir}. Skipping.")
         return
 
-    movie_frames_dir = os.path.join(output_movie_dir, "movie_frames") # frames with overlay will be saved here
+    movie_frames_dir = os.path.join(output_movie_dir, "movie_frames")  # frames with overlay will be saved here
     os.makedirs(movie_frames_dir, exist_ok=True)
 
     existing_overlay_pattern = re.compile(r"^frame_(\d+)\.png$", re.IGNORECASE)
@@ -242,15 +243,17 @@ def process_participant_dir(participant_name, overall_start_time):
     if missing_frames:
         print(f"\n=== Overlay Creation Phase for {participant_folder_name} ===")
         for i, fnum in enumerate(missing_frames, start=1):
-            out_filename = f"frame_{fnum:04d}.png"
+            # Update to 5-digit padding for the overlay output filename
+            out_filename = f"frame_{fnum:05d}.png"
             out_path = os.path.join(movie_frames_dir, out_filename)
             if os.path.exists(out_path):
-                progress_msg = f"Frame {fnum:04d} already exists. Skipping overlay."
+                progress_msg = f"Frame {fnum:05d} already exists. Skipping overlay."
                 last_messages.append(progress_msg)
                 print_dynamic_status(i, len(missing_frames))
                 continue
 
-            image_name = f"frame_{fnum:04d}_annotated.jpg"
+            # Update to 5-digit padding for the input annotated image filename
+            image_name = f"frame_{fnum:05d}_annotated.jpg"
             image_path = os.path.join(images_dir, image_name)
             if not os.path.exists(image_path):
                 progress_msg = f"Missing {image_name}; skipping."
@@ -315,7 +318,7 @@ def process_participant_dir(participant_name, overall_start_time):
                            f"x=(w-text_w)-20:y=(h-text_h)-20:"
                            f"fontcolor=white:fontsize=16")
 
-            progress_msg = f"Processing frame {fnum:04d} -> {out_filename}"
+            progress_msg = f"Processing frame {fnum:05d} -> {out_filename}"
             last_messages.append(progress_msg)
             print_dynamic_status(i, len(missing_frames))
             cmd = ["ffmpeg", "-hide_banner", "-loglevel", "warning", "-y", "-i", image_path, "-vf", filter_str, out_path]
@@ -351,17 +354,18 @@ def process_participant_dir(participant_name, overall_start_time):
         print("No PNG overlays available for final movie. Skipping combine.")
         return
 
+    # Copy overlays with updated 5-digit padding
     for i, original_fnum in enumerate(existing_frames, start=1):
-        src = os.path.join(movie_frames_dir, f"frame_{original_fnum:04d}.png")
-        dst = os.path.join(consecutive_dir, f"frame_{i:04d}.png")
+        src = os.path.join(movie_frames_dir, f"frame_{original_fnum:05d}.png")
+        dst = os.path.join(consecutive_dir, f"frame_{i:05d}.png")
         shutil.copy2(src, dst)
 
-    cmd_combine = ["ffmpeg", "-hide_banner", "-loglevel", "warning", "-y", "-framerate", "30", "-start_number", "1", "-i", os.path.join(consecutive_dir, "frame_%04d.png"), "-pix_fmt", "yuv420p", "-vcodec", "libx264", mp4_output]
+    # Update the ffmpeg input pattern to match 5-digit numbering
+    cmd_combine = ["ffmpeg", "-hide_banner", "-loglevel", "warning", "-y", "-framerate", "30", "-start_number", "1", "-i", os.path.join(consecutive_dir, "frame_%05d.png"), "-pix_fmt", "yuv420p", "-vcodec", "libx264", mp4_output]
     subprocess.run(cmd_combine, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     done_msg = f"Movie saved to: {mp4_output}\n"
     last_messages.append(done_msg)
     print(done_msg)
-
 
 def get_participant_names_from_datasheet_dir(datasheet_dir):
     participant_names = set()
@@ -371,18 +375,16 @@ def get_participant_names_from_datasheet_dir(datasheet_dir):
             participant_names.add(match.group(1))
     return sorted(list(participant_names))
 
-
 def main():
     overall_start_time = time.time()
-    datasheet_dir = MOVIE_DATASHEET_CSV_DIR # get datasheet directory from config
-    participant_names = get_participant_names_from_datasheet_dir(datasheet_dir) # get participant names from datasheet directory
+    datasheet_dir = MOVIE_DATASHEET_CSV_DIR  # get datasheet directory from config
+    participant_names = get_participant_names_from_datasheet_dir(datasheet_dir)  # get participant names from datasheet directory
 
     if not participant_names:
         raise FileNotFoundError(f"No participant datasheet CSV files found in: {datasheet_dir}")
 
     for participant_name in participant_names:
         process_participant_dir(participant_name, overall_start_time)
-
 
 if __name__ == "__main__":
     main()
