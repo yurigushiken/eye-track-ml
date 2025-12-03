@@ -25,7 +25,7 @@ Developed at the Language and Cognitive Neuroscience Lab, Teachers College, Colu
 Eye-Track-ML processes eye-tracking videos through an automated five-stage pipeline:
 
 1. **Frame Extraction** - Decomposes videos into individual frames for analysis
-2. **Event Classification** - Identifies event types (e.g., "giving woman object", "helping woman") using YOLOv11 image classification
+2. **Event Classification** - Identifies event types (e.g., "giving with toy", "give without toy") using YOLOv11 image classification
 3. **Object Detection/Segmentation** - Two options:
    - **YOLO-only**: Rectangular bounding boxes for object detection
    - **YOLO+SAM**: Precise segmentation masks with optional dilation for improved accuracy
@@ -122,7 +122,6 @@ python src/experiment_03_analysis.py
 **Training Data:**
 - Pipeline trained on 600 diverse frames
 - Additional training on challenging scenes (close proximity, occlusion)
-- Handles low-resolution videos and "invisible" object tracking
 
 **Output Format:**
 Structured CSV files with frame-by-frame annotations:
@@ -133,39 +132,22 @@ Eight-0101-1579,276,00:00:09:2000,screen,other,9.2,9.2333,"(481.00, 437.50)",gwo
 
 See [reference/](reference/) directory for complete format examples.
 
-## Documentation
-
-- [PIPELINE-README.md](pipeline/PIPELINE-README.md) - Detailed pipeline architecture and implementation
-- [experiment_data/](experiment_data/) - Sample datasets and experiment structure
-- [results/](results/) - Analysis outputs organized by experiment
-
 ## Repository Structure
 
 ```
 eye-track-ml/
-├── pipeline/
-│   ├── object_inference-yolo/        # YOLO-only pipeline (7 scripts)
-│   ├── object_inference-yolo-sam/    # YOLO+SAM pipeline (7 scripts)
-│   ├── config.py                     # Centralized configuration
-│   └── PIPELINE-README.md            # Detailed pipeline documentation
-├── src/
-│   ├── experiment_01_analysis.py     # Object detection validation
-│   ├── experiment_02_analysis.py     # Event classification validation
-│   ├── experiment_03_analysis.py     # Mask dilation optimization
-│   └── poster_visualizations.py      # Publication figures
-├── experiment_data/
-│   ├── experiment_1/                 # Object inference data
-│   ├── experiment_2/                 # Event inference data
-│   └── experiment_3/                 # Mask dilation comparison data
-├── results/
-│   ├── experiment_1/                 # Object detection results
-│   ├── experiment_2/                 # Event classification results
-│   └── experiment_3/                 # Dilation optimization results
-├── reference/                        # Sample data formats
-├── archive/
-│   ├── scripts/                      # Previous analysis versions
-│   └── results/                      # Previous results
-├── demos/                            # Demo GIFs and visualizations
+├── 1_preprocessing.py                # Frame extraction and standardization
+├── 2_inference_object_yolo.py        # YOLO object detection
+├── 2_inference_objects_yolo_sam.py   # YOLO + SAM2.1 segmentation
+├── 3_csv_objects_yolo.py             # YOLO detection results to CSV
+├── 3_csv_objects_yolo_sam.py         # SAM segmentation results to CSV
+├── 4_inference_event.py              # Event classification inference
+├── 5_csv_event.py                    # Event data compilation
+├── 6_csv_consolidation_yolo.py       # Data merging and consolidation
+├── 7_movie_yolo.py                   # Annotated video generation
+├── config.py                         # Centralized configuration
+├── requirements.txt                  # Python dependencies
+├── media/                            # Demo GIFs and poster
 └── README.md                         # This file
 ```
 
