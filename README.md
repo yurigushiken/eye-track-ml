@@ -1,188 +1,213 @@
-# Eye-Track-ML: Automating Frame-by-Frame Analysis of Eye-Tracking Videos
+# Eye-Track-ML: Automated Eye-Tracking Video Analysis Pipeline
 
-A machine learning pipeline for automated analysis of infant eye-tracking videos, processing thousands of frames efficiently.
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://img.shields.io/badge/DOI-10.13140/RG.2.2.30558.34882-blue)](https://doi.org/10.13140/RG.2.2.30558.34882)
 
-<table style="margin: auto;">
-  <tr>
-    <td style="text-align: center;">
-      <img src="media/sw_original.gif" alt="Infant Event Representations Original" style="width:800px;">
-    </td>
-    <td style="vertical-align: middle; text-align: center; font-size: 6rem; padding: 0 40px; font-weight: bold;">
-      ➡️
-    </td>
-    <td style="text-align: center;">
-      <img src="media/sw_sam2.gif" alt="Infant Event Representations V2" style="width:800px;">
-    </td>
-  </tr>
-  <tr>
-    <td style="text-align: center; padding-top: 10px;">
-      <strong>Infant Event Representations Original</strong><br>
-      <a href="https://youtu.be/jo3Jfh5NhLM" target="_blank">YouTube Video of original</a>
-    </td>
-    <td></td>
-    <td style="text-align: center; padding-top: 10px;">
-      <strong>Infant Event Representations V2</strong><br>
-      <a href="https://youtu.be/JsbvKOgkfCk" target="_blank">YouTube Video of V2</a>
-    </td>
-  </tr>
-</table>
+A machine learning pipeline for automated frame-by-frame coding of eye-tracking videos, achieving 94.24% accuracy compared to human annotation. Presented at Columbia Data Science Day, AI Day, and as a guest lecture in BBSN 5022.
 
-We begin with ~75 participant video files (~300 minutes / 540k frames) that would take many hours to code by hand. This ML-powered and rule-based verified workflow automates the process, outputting labeled video files and accompanying datasheets.
+[📄 View Full Poster](https://www.researchgate.net/publication/390447471_Eye-Track-ML_A_Machine_Learning_Pipeline_for_Automated_Frame-by-Frame_Coding_of_Eye-Tracking_Videos)
 
-## Project Structure
-```
-.
-├── 0_participant_videos/     # Raw participant video files (.avi)
-├── 1_preprocessing.py        # Frame extraction and standardization
-├── 2_inference_subjects.py   # Subject detection (YOLO + SAM2)
-├── 3_datasheet_subjects.py   # Subject data compilation
-├── 4_inference_background.py # Event classification
-├── 5_datasheet_background.py # Event data compilation
-├── 6_consolidation.py        # Data merging and validation
-└── 7_movie.py               # Final video generation
-```
+## Scientific Motivation
 
-## Pipeline Overview
+Manual annotation of eye-tracking data is labor-intensive and prone to inter-coder variability, limiting reproducibility. Our infant cognition study would have required over a hundred hours of manual coding. Eye-Track-ML automates this process by combining YOLOv11 and SAM2.1 with rule-based gaze mapping, reducing human verification to ~6% of data points.
 
-### 1. Preprocessing (`1_preprocessing.py`)
-- Extracts individual frames from AVI videos using ffmpeg
-- Standardizes frames to 1024×1024 resolution with padding
-- Creates organized frame directories for each participant
-- Real-time progress monitoring with ETA
-- Output: `1_preprocessing_output/{video_name}-1024-frames/`
+## Study Background
 
-### 2. Subject Inference (`2_inference_subjects.py`)
-- Detects key objects using YOLO and SAM2 models
-- Identifies: blue dot, faces, hands, toys, etc.
-- GPU-optimized with concurrent processing
-- Creates detection data (JSON) and visual overlays
-- Output: `2_inference_subjects_output/{name}-segmentation/`
+Developed at the Language and Cognitive Neuroscience Lab, Teachers College, Columbia University, to support research on infant event representation and attention patterns.
 
-### 3. Subject Data Compilation (`3_datasheet_subjects.py`)
-- Analyzes object detection results
-- Maps blue dot overlap with detected objects
-- Determines "What" (object type) and "Where" (location)
-- Creates frame-by-frame analysis sheets
-- Output: `3_datasheet_subjects_output/{participant}-datasheet.csv`
+**Research Question:** How can machine learning models be combined to automate fixation point annotation in eye-tracking videos with minimal human intervention?
 
-### 4. Event Classification (`4_inference_background.py`)
-- Classifies frames into event categories
-- Uses local inference server for classification
-- Categories: green_dot, f, gw, gwo, hw, etc.
-- Creates event detection data and summaries
-- Output: `4_inference_background_output/{name}-inference/`
+## What This Pipeline Does
 
-### 5. Event Data Compilation (`5_datasheet_background.py`)
-- Processes classification results
-- Groups events into trials and segments
-- Handles corrections and refinements
-- Creates comprehensive event datasheets
-- Output: `5_datasheet_background_output/{participant}-datasheet-background.csv`
+Eye-Track-ML processes eye-tracking videos through an automated five-stage pipeline:
 
-### 6. Data Consolidation (`6_consolidation.py`)
-- Merges subject and event data
-- Combines detection data with event classifications
-- Creates final consolidated datasets
-- Output: `6_consolidation_output/{participant}.csv`
+1. **Frame Extraction** - Decomposes videos into individual frames for analysis
+2. **Event Classification** - Identifies event types (e.g., "giving woman object", "helping woman") using YOLOv11 image classification
+3. **Object Detection/Segmentation** - Two options:
+   - **YOLO-only**: Rectangular bounding boxes for object detection
+   - **YOLO+SAM**: Precise segmentation masks with optional dilation for improved accuracy
+4. **Gaze Mapping** - Rule-based system determines what participants are looking at when gaze indicators intersect with detected objects
+5. **Data Consolidation** - Generates structured CSV datasheets with frame-by-frame annotations
 
-### 7. Video Generation (`7_movie.py`)
-- Creates annotated videos with information overlays
-- Shows frame info, events, timing, and metadata
-- Configurable overlay options (left, right, bottom)
-- Uses ffmpeg for high-quality frame composition
-- Output: Final MP4s with annotations
+**Human Verification Interface:** Custom video overlay displays pipeline predictions directly on frames, allowing efficient review and correction of the ~6% of data points that need adjustment.
 
-## Requirements
+## Results
 
-### System Requirements
-- Windows 10/11 or Linux
-- Python 3.8 or higher
-- CUDA-capable GPU (minimum 6GB VRAM recommended)
-- 16GB RAM minimum, 32GB recommended
-- 500GB free disk space for processing and outputs
-- ffmpeg installed and available in system PATH
+We validated the pipeline through four experiments comparing machine predictions to human-verified ground truth:
 
-### Software Dependencies
-1. **Core Python Packages**
-   - numpy (≥1.21.0)
-   - pandas (≥1.3.0)
-   - pillow (≥8.3.0)
-   - tqdm (≥4.61.0)
+| Experiment | Method | Accuracy |
+|------------|--------|----------|
+| **Experiment 1** | YOLO Bounding Boxes | 88.88% |
+| **Experiment 2** | SAM+YOLO (No Dilation) | 93.57% |
+| **Experiment 2** | SAM+YOLO (10px Dilation) | **94.24%** ⭐ |
+| **Experiment 3** | Event Classification | 99.18% |
+| **Experiment 4** | Event Classification + Symbolic Verification | **100.00%** |
 
-2. **Machine Learning & Computer Vision**
-   - PyTorch (≥1.9.0)
-   - TorchVision (≥0.10.0)
-   - OpenCV Python (≥4.5.3)
-   - Segment Anything Model (SAM2)
+**Findings:**
+- SAM+YOLO with 10px mask dilation achieved optimal performance (94.24% accuracy)
+- Combining statistical ML outputs with logical rule verification achieved perfect accuracy in event classification
+- The pipeline reduces human annotation workload to ~6% of frames
 
-3. **Services & APIs**
-   - Local Roboflow Inference Server
-   - YOLO object detection model
-   - API key for model access
+## Supported Tasks
 
-4. **Additional Tools**
-   - ffmpeg for video processing
-   - Docker (for running inference server)
+- ✅ Frame-by-frame object detection (what the participant is looking at)
+- ✅ Spatial gaze mapping (where in the scene they're looking)
+- ✅ Event sequence classification (categorizing interaction types)
+- ✅ Temporal segmentation (approach, interaction, departure phases)
+- ✅ Batch processing of multiple participants
+- ✅ Human verification workflow with visual overlay
 
-### External Services
-- Roboflow account with API access
-- Models required:
-  - Object detection model (YOLO) for subject detection
-  - Classification model for event recognition
+## Features
 
-### Installation Steps
-1. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Two Processing Modes
 
-2. Install ffmpeg:
-   - Windows: Download from https://ffmpeg.org/download.html
-   - Linux: `sudo apt-get install ffmpeg`
+**YOLO Pipeline** ([pipeline/object_inference-yolo/](pipeline/object_inference-yolo/))
+- Fast processing with rectangular bounding boxes
+- Built-in "aura effect" from box boundaries
+- 88.88% accuracy for object detection
 
-3. Set up Roboflow Inference Server:
-   ```bash
-   docker run -d --gpus all -p 9001:9001 \
-   -e ROBOFLOW_API_KEY=your_key \
-   -v /path/to/cache:/tmp/cache \
-   roboflow/roboflow-inference-server-gpu:latest
-   ```
+**YOLO-SAM Pipeline** ([pipeline/object_inference-yolo-sam/](pipeline/object_inference-yolo-sam/))
+- Precise contour-based segmentation
+- Optional mask dilation (10px optimal)
+- 94.24% accuracy for object detection
 
-4. Environment Setup:
-   - Create a `.env` file with your API keys and model IDs
-   - Ensure CUDA toolkit is installed if using GPU
-   - Add ffmpeg to system PATH
+### Mask Dilation Optimization
+The pipeline includes post-processing to create an optimal 10-pixel "aura" around segmented objects, improving fixation detection for gaze points near object boundaries—critical for infant eye-tracking where gaze precision varies.
 
-### Optional Dependencies
-- VS Code with Python extension (recommended for development)
-- NVIDIA GPU drivers and CUDA toolkit for GPU acceleration
-- Git LFS for handling large model files
+### Centralized Configuration
+All paths and settings managed through [pipeline/config.py](pipeline/config.py) for reproducibility across systems.
 
-## Setup and Usage
+### Experiment Analysis Framework
+Includes complete analysis scripts for validating pipeline performance:
+- [experiment_01_analysis.py](src/experiment_01_analysis.py) - Object detection evaluation
+- [experiment_02_analysis.py](src/experiment_02_analysis.py) - Event classification evaluation
+- [experiment_03_analysis.py](src/experiment_03_analysis.py) - Mask dilation optimization
+- [poster_visualizations.py](src/poster_visualizations.py) - Publication-ready figures
 
-1. Clone the repository:
+## Quick Start
+
 ```bash
-git clone https://github.com/YOUR_USERNAME/eye-track-ml.git
+# Clone the repository
+git clone https://github.com/yourusername/eye-track-ml.git
 cd eye-track-ml
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run YOLO-only pipeline
+python pipeline/object_inference-yolo/1_preprocessing.py
+python pipeline/object_inference-yolo/2_inference_object_yolo.py
+# ... continue with scripts 3-7
+
+# Or run YOLO-SAM pipeline for higher accuracy
+python pipeline/object_inference-yolo-sam/1_preprocessing.py
+python pipeline/object_inference-yolo-sam/2_inference_objects_yolo_sam.py
+# ... continue with scripts 3-7
+
+# Run validation analysis
+python src/experiment_01_analysis.py
+python src/experiment_02_analysis.py
+python src/experiment_03_analysis.py
 ```
 
-2. Install dependencies as outlined in the Requirements section
+## Data Requirements
 
-3. Place participant videos in `0_participant_videos/`
+**Input Format:**
+- Eye-tracking videos with gaze indicators (e.g., blue dot overlay)
+- Recommended: 30 FPS, various resolutions supported
 
-4. Run the pipeline scripts in sequence:
-```bash
-python 1_preprocessing.py
-python 2_inference_subjects.py
-python 3_datasheet_subjects.py
-python 4_inference_background.py
-python 5_datasheet_background.py
-python 6_consolidation.py
-python 7_movie.py
+**Training Data:**
+- Pipeline trained on 600 diverse frames
+- Additional training on challenging scenes (close proximity, occlusion)
+- Handles low-resolution videos and "invisible" object tracking
+
+**Output Format:**
+Structured CSV files with frame-by-frame annotations:
+```csv
+Participant,Frame Number,Time,What,Where,Onset,Offset,Blue Dot Center,event_verified,trial_number,segment,participant_type,participant_age_months
+Eight-0101-1579,276,00:00:09:2000,screen,other,9.2,9.2333,"(481.00, 437.50)",gwo,1,approach,infant,8
 ```
+
+See [reference/](reference/) directory for complete format examples.
+
+## Documentation
+
+- [PIPELINE-README.md](pipeline/PIPELINE-README.md) - Detailed pipeline architecture and implementation
+- [experiment_data/](experiment_data/) - Sample datasets and experiment structure
+- [results/](results/) - Analysis outputs organized by experiment
+
+## Repository Structure
+
+```
+eye-track-ml/
+├── pipeline/
+│   ├── object_inference-yolo/        # YOLO-only pipeline (7 scripts)
+│   ├── object_inference-yolo-sam/    # YOLO+SAM pipeline (7 scripts)
+│   ├── config.py                     # Centralized configuration
+│   └── PIPELINE-README.md            # Detailed pipeline documentation
+├── src/
+│   ├── experiment_01_analysis.py     # Object detection validation
+│   ├── experiment_02_analysis.py     # Event classification validation
+│   ├── experiment_03_analysis.py     # Mask dilation optimization
+│   └── poster_visualizations.py      # Publication figures
+├── experiment_data/
+│   ├── experiment_1/                 # Object inference data
+│   ├── experiment_2/                 # Event inference data
+│   └── experiment_3/                 # Mask dilation comparison data
+├── results/
+│   ├── experiment_1/                 # Object detection results
+│   ├── experiment_2/                 # Event classification results
+│   └── experiment_3/                 # Dilation optimization results
+├── reference/                        # Sample data formats
+├── archive/
+│   ├── scripts/                      # Previous analysis versions
+│   └── results/                      # Previous results
+├── demos/                            # Demo GIFs and visualizations
+└── README.md                         # This file
+```
+
+## Citation
+
+If you use this pipeline in your research, please cite:
+
+```bibtex
+@article{gushiken2025eyetrackml,
+  title={Eye-Track-ML: A Machine Learning Pipeline for Automated Frame-by-Frame Coding of Eye-Tracking Videos},
+  author={Gushiken, Mischa and Li, Yuexin and Tang, Jean Ee and Gordon, Peter},
+  year={2025},
+  month={March},
+  doi={10.13140/RG.2.2.30558.34882},
+  institution={Language and Cognitive Neuroscience Lab, Teachers College, Columbia University},
+  note={Presented at Columbia Data Science Day and AI Day}
+}
+```
+
+**Publication:** [ResearchGate Preprint](https://www.researchgate.net/publication/390447471_Eye-Track-ML_A_Machine_Learning_Pipeline_for_Automated_Frame-by-Frame_Coding_of_Eye-Tracking_Videos)
 
 ## License
-MIT
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
-[Language and Cognitive Lab](https://www.tc.columbia.edu/lcl/)
+
+**Research Team:**
+- Mischa Gushiken (mkg2145@tc.columbia.edu)
+- Yuexin Li (yl4964@columbia.edu)
+- Jean Ee Tang
+- Dr. Peter Gordon - Principal Investigator
+
+**Presentations:**
+- Columbia Data Science Day 2025
+- Columbia AI Day 2025
+- Guest Lecture, BBSN 5022 (Dr. Jean Tang-Lonardo)
+
+**Lab:** Language and Cognitive Neuroscience Lab, Teachers College, Columbia University
+
+---
+
+**References:**
+1. Alinaghi, N., et al. (2024). MYFix: Automated fixation annotation of eye-tracking videos. *Sensors*, 24, 2666. https://doi.org/10.3390/s24092666
+2. Deane, O., et al. (2022). Deep-SAGA: A deep-learning-based system for automatic gaze annotation. *Behavior Research Methods*, 55, 1372–1391. https://doi.org/10.3758/s13428-022-01833-4
+3. Ultralytics. (2024). YOLO11 Documentation. https://docs.ultralytics.com/models/yolo11/
+4. Ultralytics. (2024). SAM 2 Documentation. https://docs.ultralytics.com/models/sam-2/
