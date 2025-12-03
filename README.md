@@ -6,6 +6,8 @@
 
 A machine learning pipeline for automated frame-by-frame coding of eye-tracking videos, achieving 94.24% accuracy compared to human annotation. Presented at Columbia Data Science Day, AI Day, and as a guest lecture in BBSN 5022.
 
+![Eye-Track-ML Poster](media/eye-track-ml_poster.png)
+
 [📄 View Full Poster](https://www.researchgate.net/publication/390447471_Eye-Track-ML_A_Machine_Learning_Pipeline_for_Automated_Frame-by-Frame_Coding_of_Eye-Tracking_Videos)
 
 ## Scientific Motivation
